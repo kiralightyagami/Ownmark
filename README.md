@@ -40,39 +40,41 @@ The proposed platform aims to solve these problems through:
 ```mermaid
 ---
 config:
-  theme: base
+  theme: dark
   look: classic
+  layout: dagre
 ---
-graph TB
-    Buyer["Buyer Wallet"] --> Escrow["Escrow State PDA"]
-    Buyer --> BuyerPaymentATA["Buyer Payment ATA\nSOL or SPL"]
-    Buyer --> BuyerAccessATA["Buyer Access ATA"]
-    
-    Escrow --> Vault["Escrow Vault\nSOL Account or SPL ATA"]
-    AccessMint["Access Mint PDA"] --> BuyerAccessATA
-    
-    Vault --> Split["Split State PDA"]
-    Split --> CreatorATA["Creator ATA"]
-    Split --> PlatformATA["Platform Treasury ATA"]
-    Split --> CollabATA["Collaborator ATA"]
-    
-    subgraph "Buy & Mint Flow"
-        BuyerPaymentATA -->|"Transfer Payment"| Vault
-        Escrow -.->|"Triggers"| AccessMint
-        AccessMint -->|"Mint Access Token"| BuyerAccessATA
-    end
-    
-    subgraph "Revenue Distribution Flow"
-        Vault -->|"Distribute Funds"| Split
-        Split -->|"Platform Fee"| PlatformATA
-        Split -->|"Creator Share"| CreatorATA
-        Split -->|"Collaborator Share"| CollabATA
-    end
-    
-    style Escrow fill:#e1f5ff
-    style Vault fill:#fff4e1
-    style AccessMint fill:#e8f5e9
-    style Split fill:#f3e5f5
+flowchart TB
+ subgraph subGraph0["Buy & Mint Flow"]
+        Vault["Escrow Vault\nSOL Account or SPL ATA"]
+        BuyerPaymentATA["Buyer Payment ATA\nSOL or SPL"]
+        AccessMint["Access Mint PDA"]
+        Escrow["Escrow State PDA"]
+        BuyerAccessATA["Buyer Access ATA"]
+  end
+ subgraph subGraph1["Revenue Distribution Flow"]
+        Split["Split State PDA"]
+        PlatformATA["Platform Treasury ATA"]
+        CreatorATA["Creator ATA"]
+        CollabATA["Collaborator ATA"]
+  end
+    Buyer["Buyer Wallet"] --> Escrow & BuyerPaymentATA & BuyerAccessATA
+    Escrow --> Vault
+    AccessMint --> BuyerAccessATA
+    Vault --> Split
+    Split --> CreatorATA & PlatformATA & CollabATA
+    BuyerPaymentATA -- Transfer Payment --> Vault
+    Escrow -. Triggers .-> AccessMint
+    AccessMint -- Mint Access Token --> BuyerAccessATA
+    Vault -- Distribute Funds --> Split
+    Split -- Platform Fee --> PlatformATA
+    Split -- Creator Share --> CreatorATA
+    Split -- Collaborator Share --> CollabATA
+
+    style Vault fill:#fff4e1,color:#000000
+    style AccessMint fill:#e8f5e9,color:#000000
+    style Escrow fill:#e1f5ff,color:#000000
+    style Split fill:#f3e5f5,color:#000000
 
 ```
 
