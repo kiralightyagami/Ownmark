@@ -34,9 +34,47 @@ The proposed platform aims to solve these problems through:
 
 - **Revenue splitting/treasury program**: handles automatic creator/platform fee splits and withdrawals.
 
-- **Admin/Content registry program** (not sure about that): on-chain registry of content IDs: access token mint addresses / prices / creators (helps decentralize listings).
 
 ### Architecture:
+
+```mermaid
+---
+config:
+  theme: mc
+  look: classic
+---
+graph TB
+    Buyer["Buyer Wallet"] --> Escrow["Escrow State PDA"]
+    Buyer --> BuyerPaymentATA["Buyer Payment ATA\nSOL or SPL"]
+    Buyer --> BuyerAccessATA["Buyer Access ATA"]
+    
+    Escrow --> Vault["Escrow Vault\nSOL Account or SPL ATA"]
+    AccessMint["Access Mint PDA"] --> BuyerAccessATA
+    
+    Vault --> Split["Split State PDA"]
+    Split --> CreatorATA["Creator ATA"]
+    Split --> PlatformATA["Platform Treasury ATA"]
+    Split --> CollabATA["Collaborator ATA"]
+    
+    subgraph "Buy & Mint Flow"
+        BuyerPaymentATA -->|"Transfer Payment"| Vault
+        Escrow -.->|"Triggers"| AccessMint
+        AccessMint -->|"Mint Access Token"| BuyerAccessATA
+    end
+    
+    subgraph "Revenue Distribution Flow"
+        Vault -->|"Distribute Funds"| Split
+        Split -->|"Platform Fee"| PlatformATA
+        Split -->|"Creator Share"| CreatorATA
+        Split -->|"Collaborator Share"| CollabATA
+    end
+    
+    style Escrow fill:#e1f5ff
+    style Vault fill:#fff4e1
+    style AccessMint fill:#e8f5e9
+    style Split fill:#f3e5f5
+
+```
 
 #### 1. Payment Escrow Program
 
