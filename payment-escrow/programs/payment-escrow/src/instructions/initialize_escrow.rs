@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use anchor_lang::system_program::{transfer, Transfer};
 use crate::state::*;
 use crate::errors::*;
 

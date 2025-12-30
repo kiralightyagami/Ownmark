@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_lang::system_program::{transfer, Transfer};
-use anchor_spl::token::{self, Token, TokenAccount, Transfer as SplTransfer};
+use anchor_lang::system_program::{transfer, Transfer, System};
+use anchor_spl::token::{self, Transfer as SplTransfer};
 use crate::state::*;
 use crate::errors::*;
 
@@ -45,6 +45,20 @@ pub fn buy_and_mint(
         )?;
     } else {
         // SPL token payment
+        // Validate that token accounts are provided
+        require!(
+            ctx.accounts.buyer_token_account.key() != System::id(),
+            EscrowError::InvalidVault
+        );
+        require!(
+            ctx.accounts.vault_token_account.key() != System::id(),
+            EscrowError::InvalidVault
+        );
+        require!(
+            ctx.accounts.token_program.key() == anchor_spl::token::ID,
+            EscrowError::InvalidVault
+        );
+        
         token::transfer(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -102,15 +116,18 @@ pub struct BuyAndMint<'info> {
     pub vault: UncheckedAccount<'info>,
     
     /// Buyer's SPL token account (for SPL payments)
+    /// CHECK: Optional account, validated when SPL payment is used
     #[account(mut)]
-    pub buyer_token_account: Option<Account<'info, TokenAccount>>,
+    pub buyer_token_account: UncheckedAccount<'info>,
     
     /// Vault's SPL token account (for SPL payments)
+    /// CHECK: Optional account, validated when SPL payment is used
     #[account(mut)]
-    pub vault_token_account: Option<Account<'info, TokenAccount>>,
+    pub vault_token_account: UncheckedAccount<'info>,
     
     /// Token program (for SPL payments)
-    pub token_program: Option<Program<'info, Token>>,
+    /// CHECK: Optional account, validated when SPL payment is used
+    pub token_program: UncheckedAccount<'info>,
     
     /// System program
     pub system_program: Program<'info, System>,

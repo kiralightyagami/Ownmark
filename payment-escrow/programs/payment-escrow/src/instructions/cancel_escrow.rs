@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_lang::system_program::{transfer, Transfer};
-use anchor_spl::token::{self, Token, TokenAccount, Transfer as SplTransfer};
+use anchor_lang::system_program::System;
+use anchor_spl::token::{self, Transfer as SplTransfer};
 use crate::state::*;
 use crate::errors::*;
 
@@ -44,12 +44,26 @@ pub fn cancel_escrow(ctx: Context<CancelEscrow>) -> Result<()> {
             msg!("Refunded {} lamports to buyer", escrow.payment_amount);
         } else {
             // Refund SPL tokens
+            // Validate that token accounts are provided
+            require!(
+                ctx.accounts.buyer_token_account.key() != System::id(),
+                EscrowError::InvalidVault
+            );
+            require!(
+                ctx.accounts.vault_token_account.key() != System::id(),
+                EscrowError::InvalidVault
+            );
+            require!(
+                ctx.accounts.token_program.key() == anchor_spl::token::ID,
+                EscrowError::InvalidVault
+            );
+            
             token::transfer(
                 CpiContext::new_with_signer(
-                    ctx.accounts.token_program.as_ref().unwrap().to_account_info(),
+                    ctx.accounts.token_program.to_account_info(),
                     SplTransfer {
-                        from: ctx.accounts.vault_token_account.as_ref().unwrap().to_account_info(),
-                        to: ctx.accounts.buyer_token_account.as_ref().unwrap().to_account_info(),
+                        from: ctx.accounts.vault_token_account.to_account_info(),
+                        to: ctx.accounts.buyer_token_account.to_account_info(),
                         authority: ctx.accounts.vault.to_account_info(),
                     },
                     signer_seeds,
@@ -99,15 +113,18 @@ pub struct CancelEscrow<'info> {
     pub vault: UncheckedAccount<'info>,
     
     /// Buyer's SPL token account (for SPL refunds)
+    /// CHECK: Optional account, validated when SPL refund is needed
     #[account(mut)]
-    pub buyer_token_account: Option<Account<'info, TokenAccount>>,
+    pub buyer_token_account: UncheckedAccount<'info>,
     
     /// Vault's SPL token account (for SPL refunds)
+    /// CHECK: Optional account, validated when SPL refund is needed
     #[account(mut)]
-    pub vault_token_account: Option<Account<'info, TokenAccount>>,
+    pub vault_token_account: UncheckedAccount<'info>,
     
     /// Token program (for SPL refunds)
-    pub token_program: Option<Program<'info, Token>>,
+    /// CHECK: Optional account, validated when SPL refund is needed
+    pub token_program: UncheckedAccount<'info>,
     
     /// System program
     pub system_program: Program<'info, System>,
