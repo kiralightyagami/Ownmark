@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program::{transfer, Transfer, System};
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer as SplTransfer};
+use anchor_spl::token::{self, Mint, Token, Transfer as SplTransfer};
 use anchor_spl::associated_token::AssociatedToken;
 use access_mint::{
     program::AccessMint,
@@ -175,6 +175,7 @@ pub struct BuyAndMint<'info> {
     pub mint_authority: UncheckedAccount<'info>,
     
     /// Buyer's access token account (will be created if needed)
+    /// CHECK: Validated and potentially created by access mint program via CPI
     #[account(mut)]
     pub buyer_access_token_account: UncheckedAccount<'info>,
     
