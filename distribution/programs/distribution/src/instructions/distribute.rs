@@ -1,13 +1,12 @@
 use anchor_lang::prelude::*;
-use anchor_lang::system_program::{transfer, Transfer};
-use anchor_spl::token::{self, Token, Transfer as SplTransfer};
+use anchor_spl::token::{self, Transfer as SplTransfer};
 use crate::state::*;
 use crate::errors::*;
 
 /// Distribute funds from vault to all recipients
 /// Called via CPI from payment escrow program
-pub fn distribute(
-    ctx: Context<Distribute>,
+pub fn distribute<'info>(
+    ctx: Context<'_, '_, '_, 'info, Distribute<'info>>,
     amount: u64,
 ) -> Result<()> {
     let split_state = &mut ctx.accounts.split_state;
@@ -21,10 +20,11 @@ pub fn distribute(
     let creator_amount = split_state.calculate_creator_share(amount)?;
     
     // Get vault bump for signing
+    let split_state_key = split_state.key();
     let vault_bump = ctx.bumps.vault;
     let vault_seeds = &[
         b"vault".as_ref(),
-        split_state.key().as_ref(),
+        split_state_key.as_ref(),
         &[vault_bump],
     ];
     let signer_seeds = &[&vault_seeds[..]];

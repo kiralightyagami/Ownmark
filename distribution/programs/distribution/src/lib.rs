@@ -41,7 +41,10 @@ pub mod distribution {
     ///
     /// # Arguments
     /// * `amount` - Total amount to distribute
-    pub fn distribute(ctx: Context<Distribute>, amount: u64) -> Result<()> {
+    pub fn distribute<'info>(
+        ctx: Context<'_, '_, '_, 'info, Distribute<'info>>,
+        amount: u64,
+    ) -> Result<()> {
         instructions::distribute::distribute(ctx, amount)
     }
 }
