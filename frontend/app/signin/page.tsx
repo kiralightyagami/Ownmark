@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
-import { signIn } from "@/lib/auth-client";
+import { signIn, authClient } from "@/lib/auth-client";
 
 export default function SigninPage() {
   const router = useRouter();
@@ -39,8 +39,16 @@ export default function SigninPage() {
         throw new Error(error.message || "Invalid credentials");
       }
 
-      // Redirect to dashboard
-      router.push("/dashboard");
+      // Fetch user role to redirect
+      const session = await authClient.getSession();
+      const role = (session?.data?.user as any)?.role;
+
+      
+      if (role === "CREATOR") {
+        router.push("/dashboard/creator");
+      } else {
+        router.push("/dashboard");
+      }
       router.refresh();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Something went wrong";

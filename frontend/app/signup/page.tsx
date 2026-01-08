@@ -68,8 +68,12 @@ export default function SignupPage() {
         throw new Error(signinError.message || "Auto sign-in failed");
       }
 
-      // Redirect to dashboard
-      router.push("/dashboard");
+  
+      if (role === "CREATOR") {
+        router.push("/dashboard/creator");
+      } else {
+        router.push("/dashboard");
+      }
       router.refresh();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Something went wrong";

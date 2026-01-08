@@ -13,6 +13,10 @@ import {
   User,
   ShoppingBag,
   Menu,
+  LayoutDashboard,
+  Package,
+  TrendingUp,
+  DollarSign
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,7 +25,6 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 
 type SidebarProps = React.HTMLAttributes<HTMLDivElement>;
-
 
 const FALLBACK_AVATARS = [
   "https://cdn.jsdelivr.net/gh/alohe/avatars/png/vibrent_1.png",
@@ -44,11 +47,45 @@ export function Sidebar({ className }: SidebarProps) {
     router.push("/signin");
   };
 
-
   const avatarIndex = session?.user?.email ? session.user.email.length % FALLBACK_AVATARS.length : 0;
   const fallbackAvatar = FALLBACK_AVATARS[avatarIndex];
+  
+  const role = (session?.user as { role?: string })?.role || (pathname.startsWith("/dashboard/creator") ? "CREATOR" : undefined);
+  
+  const creatorRoutes = [
+    {
+      label: "Home",
+      icon: LayoutDashboard,
+      href: "/dashboard/creator",
+      active: pathname === "/dashboard/creator",
+    },
+    {
+      label: "My Products",
+      icon: Package,
+      href: "/dashboard/creator/products",
+      active: pathname === "/dashboard/creator/products",
+    },
+    {
+      label: "Sales",
+      icon: DollarSign,
+      href: "/dashboard/creator/sales",
+      active: pathname === "/dashboard/creator/sales",
+    },
+    {
+      label: "Analytics",
+      icon: TrendingUp,
+      href: "/dashboard/creator/analytics",
+      active: pathname === "/dashboard/creator/analytics",
+    },
+    {
+      label: "Settings",
+      icon: Settings,
+      href: "/dashboard/settings",
+      active: pathname === "/dashboard/settings",
+    },
+  ];
 
-  const routes = [
+  const buyerRoutes = [
     {
       label: "Discover",
       icon: Compass,
@@ -68,6 +105,8 @@ export function Sidebar({ className }: SidebarProps) {
       active: pathname === "/dashboard/settings",
     },
   ];
+
+  const routes = role === "CREATOR" ? creatorRoutes : buyerRoutes;
 
   return (
     <div className={cn("pb-12 min-h-screen w-64 bg-zinc-950 border-r border-zinc-800", className)}>
@@ -124,7 +163,7 @@ export function Sidebar({ className }: SidebarProps) {
                 {session?.user?.name || "User"}
               </span>
               <span className="text-xs text-zinc-500 truncate">
-                {session?.user?.email || "View Profile"}
+                {role === "CREATOR" ? "Creator Account" : (session?.user?.email || "View Profile")}
               </span>
             </div>
           </div>
