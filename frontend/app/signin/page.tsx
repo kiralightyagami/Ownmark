@@ -39,8 +39,8 @@ export default function SigninPage() {
         throw new Error(error.message || "Invalid credentials");
       }
 
-      // Redirect to home
-      router.push("/");
+      // Redirect to dashboard
+      router.push("/dashboard");
       router.refresh();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Something went wrong";
