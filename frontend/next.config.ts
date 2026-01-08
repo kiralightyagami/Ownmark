@@ -4,6 +4,15 @@ const nextConfig: NextConfig = {
   /* config options here */
   // Ignore favicon.ico in app directory to avoid file locking issues
   // Favicon should be in public folder or configured via metadata
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: "/signup",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
