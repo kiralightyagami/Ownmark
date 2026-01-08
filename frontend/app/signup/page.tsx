@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, User, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { signUp, signIn } from "@/lib/auth-client";
 
 type RoleOption = "BUYER" | "CREATOR";
 
@@ -34,16 +35,15 @@ export default function SignupPage() {
     setError(null);
 
     try {
-      // 1. Create User
-      const signupRes = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+      // 1. Create User with better-auth
+      const { data: signupData, error: signupError } = await signUp.email({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
       });
 
-      if (!signupRes.ok) {
-        const data = await signupRes.json().catch(() => ({}));
-        throw new Error(data?.message || "Sign up failed");
+      if (signupError) {
+        throw new Error(signupError.message || "Sign up failed");
       }
 
       // 2. Set Role
@@ -53,21 +53,24 @@ export default function SignupPage() {
         body: JSON.stringify({ email: formData.email, role }),
       });
 
-      if (!roleRes.ok) throw new Error("Failed to set role");
+      if (!roleRes.ok) {
+        const roleData = await roleRes.json();
+        throw new Error(roleData.error || "Failed to set role");
+      }
 
-      // 3. Auto Sign In
-      const signinRes = await fetch("/api/auth/signin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
+      // 3. Auto Sign In with better-auth
+      const { error: signinError } = await signIn.email({
+        email: formData.email,
+        password: formData.password,
       });
 
-      if (!signinRes.ok) throw new Error("Auto sign-in failed");
+      if (signinError) {
+        throw new Error(signinError.message || "Auto sign-in failed");
+      }
 
+      // Redirect to home
       router.push("/");
+      router.refresh();
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Something went wrong";
       setError(errorMessage);

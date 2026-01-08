@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
+import { signIn } from "@/lib/auth-client";
 
 export default function SigninPage() {
   const router = useRouter();
@@ -28,20 +29,22 @@ export default function SigninPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/auth/signin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+      // Sign in with better-auth
+      const { error } = await signIn.email({
+        email: formData.email,
+        password: formData.password,
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.message || "Invalid credentials");
+      if (error) {
+        throw new Error(error.message || "Invalid credentials");
       }
 
+      // Redirect to home
       router.push("/");
-    } catch (err: any) {
-      setError(err.message);
+      router.refresh();
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Something went wrong";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
