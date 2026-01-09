@@ -85,7 +85,7 @@ export function AuthWrapper({
 
         <div className={cn("w-full max-w-sm space-y-6 z-10", className)}>
         {/* Logo Centered above Form */}
-        <div className="flex items-center justify-center gap-3 mb-8">
+        <div className="flex items-center justify-center gap-3 mb-4">
           <div className="relative w-8 h-8">
             <Image
               src="/icons/Ownmark.svg"
@@ -99,6 +99,10 @@ export function AuthWrapper({
               OWNMARK
             </span>
         </div>
+
+        <p className="text-center text-zinc-400 text-md font-medium tracking-[0.2em] uppercase">
+          Create it. Own it. Ship it.
+        </p>
 
           <div className="space-y-2 text-center">
             <h2 className="text-2xl font-bold tracking-tight text-white font-[family-name:var(--font-geist-sans)]">
