@@ -20,10 +20,12 @@ model User {
   emailVerified Boolean   @default(false)
   image         String?
   role          Role      @default(BUYER)
+  walletAddress String?   
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
+  products      Product[]
 
   @@unique([email])
   @@map("user")
@@ -33,6 +35,22 @@ enum Role {
   CREATOR
   BUYER
   ADMIN
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  price       Float
+  coverImage  String?
+  gdriveLink  String
+  creatorId   String
+  creator     User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([creatorId])
+  @@map("product")
 }
 
 model Session {

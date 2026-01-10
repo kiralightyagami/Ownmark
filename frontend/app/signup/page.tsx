@@ -6,10 +6,13 @@ import { AuthWrapper } from "@/components/auth-wrapper";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Loader2, User, ShoppingBag } from "lucide-react";
+import { Loader2, User, ShoppingBag, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { signUp, signIn } from "@/lib/auth-client";
+import axios from "axios";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 type RoleOption = "BUYER" | "CREATOR";
 
@@ -18,15 +21,31 @@ export default function SignupPage() {
   const [role, setRole] = useState<RoleOption>("BUYER");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { publicKey, connected, disconnect } = useWallet();
+  const { setVisible } = useWalletModal();
 
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
+    walletAddress: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.id]: e.target.value }));
+  };
+
+  const handleWalletConnect = () => {
+    setVisible(true);
+  };
+
+  const handleWalletDisconnect = async () => {
+    try {
+      await disconnect();
+      setFormData((prev) => ({ ...prev, walletAddress: "" }));
+    } catch (err) {
+      console.error("Wallet disconnection failed:", err);
+    }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -35,6 +54,13 @@ export default function SignupPage() {
     setError(null);
 
     try {
+      // Validate Creator has wallet
+      if (role === "CREATOR" && !publicKey && !formData.walletAddress) {
+        throw new Error("Creators must connect a wallet or provide wallet address");
+      }
+
+      const walletToUse = connected && publicKey ? publicKey.toBase58() : formData.walletAddress;
+
       // 1. Create User with better-auth
       const { data: signupData, error: signupError } = await signUp.email({
         email: formData.email,
@@ -46,17 +72,12 @@ export default function SignupPage() {
         throw new Error(signupError.message || "Sign up failed");
       }
 
-      // 2. Set Role
-      const roleRes = await fetch("/api/user/role", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: formData.email, role }),
+      // 2. Set Role and Wallet
+      await axios.post("/api/user/role", {
+        email: formData.email, 
+        role,
+        walletAddress: role === "CREATOR" ? walletToUse : null
       });
-
-      if (!roleRes.ok) {
-        const roleData = await roleRes.json();
-        throw new Error(roleData.error || "Failed to set role");
-      }
 
       // 3. Auto Sign In with better-auth
       const { error: signinError } = await signIn.email({
@@ -156,6 +177,59 @@ export default function SignupPage() {
               className="bg-zinc-900/50 border-zinc-800 focus:border-zinc-700 text-white placeholder:text-zinc-600"
             />
           </div>
+
+          {/* Wallet Address for Creators */}
+          {role === "CREATOR" && (
+            <div className="space-y-2">
+              <Label htmlFor="walletAddress" className="text-white font-medium">
+                Solana Wallet Address {connected && publicKey && <span className="text-green-400 text-xs">(Connected ✓)</span>}
+              </Label>
+              
+              {!connected ? (
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    onClick={handleWalletConnect}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    <Wallet className="mr-2 h-4 w-4" /> Connect Wallet
+                  </Button>
+                  <div className="relative flex items-center justify-center text-xs text-zinc-500">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-zinc-800"></div>
+                    </div>
+                    <div className="relative bg-black px-2">or enter manually</div>
+                  </div>
+                  <div className="relative">
+                    <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                    <Input
+                      id="walletAddress"
+                      placeholder="e.g. 7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+                      value={formData.walletAddress}
+                      onChange={handleChange}
+                      className="bg-zinc-900/50 border-zinc-800 focus:border-zinc-700 text-white placeholder:text-zinc-600 pl-10"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-md px-3 py-2 text-sm text-white truncate">
+                    {publicKey?.toBase58()}
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleWalletDisconnect}
+                    variant="outline"
+                    size="sm"
+                    className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                  >
+                    Disconnect
+                  </Button>
+                </div>
+              )}
+              <p className="text-xs text-zinc-500">This wallet will receive payments for your products.</p>
+            </div>
+          )}
         </div>
 
         {error && (

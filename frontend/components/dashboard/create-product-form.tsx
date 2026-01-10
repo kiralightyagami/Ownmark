@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, Loader2, Link as LinkIcon, DollarSign, FileText, Image as ImageIcon, Package, ChevronUp, ChevronDown } from "lucide-react";
 import Image from "next/image";
+import axios from "axios";
 
 export function CreateProductForm() {
   const [loading, setLoading] = useState(false);
@@ -47,13 +48,27 @@ export function CreateProductForm() {
     setLoading(true);
 
     try {
-      // TODO: Implement product creation logic
-      console.log("Form Data:", { ...formData, coverImage });
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      await axios.post("/api/product", {
+        name: formData.name,
+        description: formData.description,
+        price: parseFloat(formData.amount),
+        coverImage: coverImage,
+        gdriveLink: formData.gdriveLink,
+      });
+
+      // Success - reset form
+      setFormData({ name: "", description: "", amount: "", gdriveLink: "" });
+      setCoverImage(null);
       
-      // Success logic here
+      // Optionally: close dialog, show success toast, etc.
+      window.location.reload(); // Refresh to show new product
     } catch (error) {
       console.error("Failed to create product", error);
+      if (axios.isAxiosError(error)) {
+        alert(error.response?.data?.error || "Failed to create product");
+      } else {
+        alert(error instanceof Error ? error.message : "Failed to create product");
+      }
     } finally {
       setLoading(false);
     }

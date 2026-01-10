@@ -6,7 +6,7 @@ const VALID_ROLES = ["BUYER", "CREATOR", "ADMIN"] as const;
 
 export async function POST(req: Request) {
   try {
-    const { email, role } = await req.json();
+    const { email, role, walletAddress } = await req.json();
 
     // Validate required fields
     if (!email || !role) {
@@ -33,10 +33,24 @@ export async function POST(req: Request) {
       );
     }
 
-    // Update user role
+    // Validate wallet address for creators
+    if (role === "CREATOR" && walletAddress) {
+      // Basic Solana address validation (44 characters, base58)
+      if (walletAddress.length < 32 || walletAddress.length > 44) {
+        return NextResponse.json(
+          { error: "Invalid Solana wallet address" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Update user role and wallet address
     const result = await prisma.user.updateMany({
       where: { email },
-      data: { role },
+      data: { 
+        role,
+        ...(walletAddress && { walletAddress })
+      },
     });
 
     // Check if user was found and updated
@@ -49,7 +63,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       success: true,
-      message: `Role updated to ${role}` 
+      message: `Role updated to ${role}${walletAddress ? ' with wallet connected' : ''}` 
     });
   } catch (error) {
     console.error("Failed to update role:", error);
