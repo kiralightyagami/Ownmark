@@ -38,18 +38,25 @@ enum Role {
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  name        String
-  description String
-  price       Float
-  coverImage  String?
-  gdriveLink  String
-  creatorId   String
-  creator     User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(cuid())
+  name             String
+  description      String
+  price            Float
+  coverImage       String?
+  gdriveLink       String
+  creatorId        String
+  creator          User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  // Blockchain fields
+  contentId        String?  @unique // 32-byte hex string
+  accessMintAddress String? @unique // Access mint PDA address
+  splitStateAddress String? @unique // Distribution split state PDA address
+  platformFeeBps   Int?     @default(200) // Platform fee in basis points (default 2%)
+  seed             BigInt?  @default(1) // Seed for PDA derivation
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([creatorId])
+  @@index([contentId])
   @@map("product")
 }
 

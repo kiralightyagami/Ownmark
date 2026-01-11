@@ -60,9 +60,15 @@ export async function POST(req: Request) {
       },
     });
 
+    // Convert BigInt to string for JSON serialization
+    const productResponse = {
+      ...product,
+      seed: product.seed?.toString() ?? null,
+    };
+
     return NextResponse.json({ 
       success: true,
-      product 
+      product: productResponse
     });
   } catch (error) {
     console.error("Failed to create product:", error);
@@ -96,7 +102,13 @@ export async function GET(req: Request) {
       },
     });
 
-    return NextResponse.json({ products });
+    // Convert BigInt to string for JSON serialization
+    const productsResponse = products.map(product => ({
+      ...product,
+      seed: product.seed?.toString() ?? null,
+    }));
+
+    return NextResponse.json({ products: productsResponse });
   } catch (error) {
     console.error("Failed to fetch products:", error);
     return NextResponse.json(

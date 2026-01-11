@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Image as ImageIcon, Package } from "lucide-react";
+import { ShoppingCart, Image as ImageIcon } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import axios from "axios";
 import { WalletConnectButton } from "@/components/wallet-connect-button";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -21,49 +22,34 @@ interface Product {
     name: string;
     image: string | null;
   };
+  accessMintAddress: string | null;
+  splitStateAddress: string | null;
 }
 
-export default function LibraryPage() {
+export default function MarketplacePage() {
   const { publicKey, connected } = useWallet();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (connected) {
-      fetchPurchasedProducts();
-    } else {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const response = await axios.get("/api/product");
+      setProducts(response.data.products || []);
+    } catch (error) {
+      console.error("Failed to fetch products:", error);
+    } finally {
       setLoading(false);
     }
-  }, [connected]);
-
-  const fetchPurchasedProducts = async () => {
-    // TODO: Fetch products that user has purchased
-    // This would require checking for access tokens owned by the user's wallet
-    // For now, showing empty state
-    setLoading(false);
   };
 
   if (loading) {
     return (
       <div className="container mx-auto py-12">
-        <div className="text-center text-white">Loading your library...</div>
-      </div>
-    );
-  }
-
-  if (!connected) {
-    return (
-      <div className="container mx-auto py-12 px-4">
-        <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
-          <Package className="h-16 w-16 text-zinc-600" />
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-2">Connect Your Wallet</h2>
-            <p className="text-zinc-400 mb-6">
-              Connect your wallet to view your purchased digital assets
-            </p>
-            <WalletConnectButton />
-          </div>
-        </div>
+        <div className="text-center text-white">Loading products...</div>
       </div>
     );
   }
@@ -72,21 +58,15 @@ export default function LibraryPage() {
     <div className="container mx-auto py-12 px-4">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-4xl font-bold text-white mb-2">My Library</h1>
-          <p className="text-zinc-400">Your purchased digital assets</p>
+          <h1 className="text-4xl font-bold text-white mb-2">Marketplace</h1>
+          <p className="text-zinc-400">Discover and purchase digital assets</p>
         </div>
+        <WalletConnectButton />
       </div>
 
       {products.length === 0 ? (
         <div className="text-center py-16">
-          <Package className="h-16 w-16 text-zinc-600 mx-auto mb-4" />
-          <p className="text-zinc-400 text-lg mb-2">No purchases yet</p>
-          <p className="text-zinc-500 text-sm mb-6">
-            Start browsing the marketplace to discover digital assets
-          </p>
-          <Button asChild className="bg-[#007DFC] hover:bg-[#0063ca]">
-            <a href="/marketplace">Browse Marketplace</a>
-          </Button>
+          <p className="text-zinc-400 text-lg">No products available yet</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -110,21 +90,31 @@ export default function LibraryPage() {
               </CardHeader>
               <CardContent className="p-4">
                 <CardTitle className="text-lg mb-2 line-clamp-1">{product.name}</CardTitle>
-                <CardDescription className="text-zinc-400 text-sm line-clamp-2">
+                <CardDescription className="text-zinc-400 text-sm line-clamp-2 mb-4">
                   {product.description}
                 </CardDescription>
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl font-bold text-[#007DFC]">
+                    {product.price} SOL
+                  </span>
+                  <span className="text-sm text-zinc-500">
+                    by {product.creator.name}
+                  </span>
+                </div>
               </CardContent>
               <CardFooter className="p-4 pt-0">
-                <Button
-                  asChild
-                  variant="outline"
-                  className="w-full border-zinc-700 text-white hover:bg-zinc-800"
-                >
-                  <a href={product.gdriveLink} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Access Content
-                  </a>
-                </Button>
+                {product.accessMintAddress && product.splitStateAddress ? (
+                  <Link href={`/marketplace/${product.id}`} className="w-full">
+                    <Button className="w-full bg-[#007DFC] hover:bg-[#0063ca] text-white">
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      Buy Now
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button disabled className="w-full bg-zinc-800 text-zinc-500">
+                    Not Available
+                  </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
