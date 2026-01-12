@@ -266,7 +266,7 @@ export default function CreatorDashboard() {
                     </div>
                   )}
                   {product.accessMintAddress && product.splitStateAddress && (
-                    <div className="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                    <div className="absolute top-2 right-2 bg-green-600 text-black text-xs px-2 py-1 rounded font-bold">
                       Active
                     </div>
                   )}
@@ -291,7 +291,7 @@ export default function CreatorDashboard() {
                   <Button
                     asChild
                     variant="outline"
-                    className="flex-1 border-zinc-700 text-white hover:bg-zinc-800"
+                    className="flex-1 border-zinc-700 text-black bg-white hover:bg-zinc-200"
                   >
                     <Link href={`/marketplace/${product.id}`}>
                       View
@@ -301,7 +301,7 @@ export default function CreatorDashboard() {
                     <Button
                       asChild
                       variant="outline"
-                      className="border-zinc-700 text-white hover:bg-zinc-800"
+                      className="border-zinc-700 text-black bg-white hover:bg-zinc-200"
                     >
                       <a href={product.gdriveLink} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="h-4 w-4" />

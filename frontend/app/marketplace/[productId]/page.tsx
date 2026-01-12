@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ShoppingCart, Image as ImageIcon, Loader2 } from "lucide-react";
+import { ArrowLeft, ShoppingCart, Image as ImageIcon, Loader2, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import axios from "axios";
@@ -109,21 +109,23 @@ export default function ProductDetailPage() {
         publicKey
       );
 
-      // Check if escrow already exists
+      // Check if escrow already exists and its status
       const escrowState = new PublicKey(buyParams.accounts.escrowState);
-      let escrowExists = false;
+      let escrowAccount = null;
+      
       try {
-        const accountInfo = await connection.getAccountInfo(escrowState);
-        escrowExists = accountInfo !== null;
+        escrowAccount = await paymentEscrowProgram.account.escrowState.fetch(escrowState);
       } catch (error) {
-        // Escrow doesn't exist
+        // Escrow doesn't exist, which is fine - we'll initialize it
+        escrowAccount = null;
       }
 
       const tx = new Transaction();
 
-      // Initialize escrow if it doesn't exist
-      if (!escrowExists) {
-        // Use paymentAmount (in lamports) for the price
+      // Initialize escrow only if it doesn't exist
+      // If it exists, check its status
+      if (!escrowAccount) {
+        // Escrow doesn't exist, initialize it
         const priceInLamports = buyParams.paymentAmount || buyParams.accounts.price;
         if (!priceInLamports || priceInLamports <= 0) {
           throw new Error("Invalid product price");
@@ -145,6 +147,17 @@ export default function ProductDetailPage() {
           .instruction();
         
         tx.add(initializeEscrowIx);
+      } else {
+        // Escrow exists - check if it's in a valid state
+        const status = escrowAccount.status;
+        if (status && typeof status === 'object') {
+          if ('completed' in status) {
+            throw new Error("This purchase has already been completed. Please refresh the page.");
+          } else if ('cancelled' in status) {
+            throw new Error("This escrow was cancelled. Please refresh the page to create a new purchase.");
+          }
+          // If status is 'initialized', we can proceed with buyAndMint
+        }
       }
 
       // Get accounts for SOL payment
@@ -212,11 +225,18 @@ export default function ProductDetailPage() {
     }
   };
 
+  // Determine if the connected wallet is the product creator
+  const isCreator =
+    connected &&
+    product?.creator.walletAddress &&
+    publicKey &&
+    product.creator.walletAddress.toLowerCase() === publicKey.toBase58().toLowerCase();
+
   if (loading) {
     return (
-      <div className="container mx-auto py-12">
+      <div className="container mx-auto py-12 bg-black min-h-screen">
         <div className="text-center text-white">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-[#007DFC]" />
           <p>Loading product...</p>
         </div>
       </div>
@@ -225,10 +245,10 @@ export default function ProductDetailPage() {
 
   if (!product) {
     return (
-      <div className="container mx-auto py-12 px-4">
+      <div className="container mx-auto py-12 px-4 bg-black min-h-screen">
         <div className="text-center text-white space-y-4">
           <h2 className="text-2xl font-bold">Product not found</h2>
-          <p className="text-zinc-400">The product you're looking for doesn't exist or has been removed.</p>
+          <p className="text-gray-400">The product you're looking for doesn't exist or has been removed.</p>
           <Link href="/marketplace">
             <Button className="bg-[#007DFC] hover:bg-[#0063ca] text-white">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -240,18 +260,54 @@ export default function ProductDetailPage() {
     );
   }
 
-  return (
-    <div className="container mx-auto py-12 px-4 max-w-4xl">
-      <Link href="/marketplace">
-        <Button variant="ghost" className="mb-6 text-white hover:text-white">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Marketplace
-        </Button>
-      </Link>
+  // Parse description into structured format
+  const descriptionText = product.description || '';
+  const descriptionLines = descriptionText.split('\n').map(line => line.trim()).filter(Boolean);
+  
+  // Find intro line (usually contains "contains", "zip", or is the first sentence)
+  const introLine = descriptionLines.find(line => 
+    line.toLowerCase().includes('contains') || 
+    line.toLowerCase().includes('zip file') ||
+    line.toLowerCase().includes('this')
+  ) || (descriptionLines[0] && descriptionLines[0].length > 20 ? descriptionLines[0] : '');
+  
+  // Extract list items (lines that are short and don't contain common phrases)
+  const listItems = descriptionLines.filter(line => {
+    const lower = line.toLowerCase();
+    return line.length < 50 && 
+           !lower.includes('hello') && 
+           !lower.includes('contains') &&
+           !lower.includes('p.s.') &&
+           !lower.includes('don\'t forget') &&
+           !lower.includes('rate') &&
+           !lower.includes('follow') &&
+           !lower.includes('free') &&
+           !lower.includes('type') &&
+           !lower.includes('zero') &&
+           !lower.includes('price') &&
+           !lower.includes('enjoy') &&
+           !lower.includes('package') &&
+           !lower.includes('and this');
+  }).slice(0, 10);
+  
+  // If no list items found, try splitting by periods or commas
+  const fallbackItems = descriptionText.split(/[.,;]/)
+    .map(item => item.trim())
+    .filter(item => item.length > 0 && item.length < 50 && !item.toLowerCase().includes('hello'))
+    .slice(0, 5);
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+  return (
+    <div className="bg-black min-h-screen">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <Link href={isCreator ? "/dashboard/creator" : "/marketplace"}>
+          <Button variant="ghost" className="mb-6 text-white hover:text-white hover:bg-gray-900">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to {isCreator ? "Creator Dashboard" : "Marketplace"}
+          </Button>
+        </Link>
+
         {/* Product Image */}
-        <div className="relative aspect-square w-full bg-zinc-900 rounded-lg overflow-hidden">
+        <div className="relative w-full h-64 md:h-96 mb-6 rounded-lg overflow-hidden bg-black border-2 border-white">
           {product.coverImage ? (
             <Image
               src={product.coverImage}
@@ -261,63 +317,108 @@ export default function ProductDetailPage() {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <ImageIcon className="h-24 w-24 text-zinc-600" />
+              <ImageIcon className="h-24 w-24 text-gray-600" />
             </div>
           )}
         </div>
 
-        {/* Product Info */}
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-4xl font-bold text-white mb-4">{product.name}</h1>
-            <p className="text-2xl font-bold text-[#007DFC] mb-4">
-              {product.price} SOL
-            </p>
-            <p className="text-zinc-400 mb-4">
-              by {product.creator.name}
-            </p>
-          </div>
+        {/* Main Product Container with Border */}
+        <div className="border border-gray-400 bg-white rounded-lg overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-0">
+            {/* Left Column - Product Content */}
+            <div className="lg:col-span-3 p-6 space-y-4">
+              {/* Product Title */}
+              <h1 className="text-3xl md:text-4xl font-bold text-black">
+                {product.name}
+              </h1>
 
-          <Card className="bg-zinc-900 border-zinc-800 text-white">
-            <CardHeader>
-              <CardTitle>Description</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-zinc-300 whitespace-pre-wrap">
-                {product.description}
-              </p>
-            </CardContent>
-          </Card>
+              {/* Horizontal Line */}
+              <div className="border-t border-black"></div>
 
-          <div className="space-y-4">
-            {!connected ? (
-              <div className="space-y-2">
-                <p className="text-zinc-400 text-sm">Connect your wallet to purchase</p>
-                <WalletConnectButton />
+              {/* Metadata Bar */}
+              <div className="flex items-center gap-4 flex-wrap">
+                {/* Price Tag */}
+                <div 
+                  className="relative bg-[#007DFC] text-white font-bold text-sm px-3 py-1.5 pr-5 inline-block"
+                  style={{
+                    clipPath: 'polygon(0% 0%, 100% 0%, 85% 50%, 100% 100%, 0% 100%)'
+                  }}
+                >
+                  ${product.price}+
+                </div>
+
+                {/* Ratings */}
+                <div className="flex items-center gap-1 ml-auto">
+                  <div className="flex items-center gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-black text-black" />
+                    ))}
+                  </div>
+                  <span className="text-black font-bold ml-1">232 ratings</span>
+                </div>
               </div>
-            ) : product.accessMintAddress && product.splitStateAddress ? (
-              <Button
-                onClick={handlePurchase}
-                disabled={purchasing}
-                className="w-full bg-[#007DFC] hover:bg-[#0063ca] text-white text-lg py-6"
-              >
-                {purchasing ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="mr-2 h-5 w-5" />
-                    Purchase for {product.price} SOL
-                  </>
+
+              {/* Horizontal Line */}
+              <div className="border-t border-black"></div>
+
+              {/* Description Section */}
+              <div className="space-y-3 pt-2">
+                <h2 className="text-lg font-bold text-black">Hello there!</h2>
+                {introLine && (
+                  <p className="text-black italic">
+                    {introLine}
+                  </p>
                 )}
-              </Button>
-            ) : (
-              <Button disabled className="w-full bg-zinc-800 text-zinc-500">
-                Product Not Available
-              </Button>
-            )}
+                <div className="space-y-1 pl-4">
+                  {(listItems.length > 0 ? listItems : fallbackItems).map((item, idx) => (
+                    <div key={idx} className="text-black font-bold">
+                      {item.trim()}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-black font-bold">
+                  P.S.: Don't forget to rate and follow for more value.
+                </p>
+                <p className="text-black">
+                  And this pack is free. Just type the 0 (zero number) on the price. After you can enjoy yourself with the package).
+                </p>
+              </div>
+            </div>
+
+            {/* Right Column - Buy Button */}
+            <div className="lg:col-span-1 border-l border-black p-6">
+              {isCreator ? (
+                <div className="w-full text-center text-black font-semibold">
+                  You are the creator of this product.
+                </div>
+              ) : !connected ? (
+                <div className="w-full">
+                  <WalletConnectButton />
+                </div>
+              ) : product.accessMintAddress && product.splitStateAddress ? (
+                <Button
+                  onClick={handlePurchase}
+                  disabled={purchasing}
+                  className="w-full bg-white hover:bg-gray-100 text-black text-lg py-6 font-bold border-2 border-black"
+                >
+                  {purchasing ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="mr-2 h-5 w-5" />
+                      Buy
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button disabled className="w-full bg-gray-200 text-gray-500 text-lg py-6 border-2 border-gray-400">
+                  Product Not Available
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
