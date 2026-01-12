@@ -6,9 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, Loader2, Link as LinkIcon, DollarSign, FileText, Image as ImageIcon, Package, ChevronUp, ChevronDown } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Upload, Loader2, Link as LinkIcon, DollarSign, FileText, Image as ImageIcon, Package, ChevronUp, ChevronDown, Zap } from "lucide-react";
 import Image from "next/image";
 import axios from "axios";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useAccessMintProgram } from "@/lib/programs/use-access-mint";
+import { useDistributionProgram } from "@/lib/programs/use-distribution";
+import { PublicKey, Keypair } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { SystemProgram } from "@solana/web3.js";
+import * as anchor from "@coral-xyz/anchor";
 
 interface CreateProductFormProps {
   onSuccess?: () => void;
@@ -16,7 +24,12 @@ interface CreateProductFormProps {
 
 export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
   const [loading, setLoading] = useState(false);
+  const [initLoading, setInitLoading] = useState(false);
+  const [initializeOnChain, setInitializeOnChain] = useState(false);
   const [coverImage, setCoverImage] = useState<string | null>(null);
+  const { publicKey, connected } = useWallet();
+  const { program: accessMintProgram, provider: accessMintProvider } = useAccessMintProgram();
+  const { program: distributionProgram, provider: distributionProvider } = useDistributionProgram();
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -52,7 +65,8 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
     setLoading(true);
 
     try {
-      await axios.post("/api/product", {
+      // 1. Create product in database
+      const response = await axios.post("/api/product", {
         name: formData.name,
         description: formData.description,
         price: parseFloat(formData.amount),
@@ -60,9 +74,102 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
         gdriveLink: formData.gdriveLink,
       });
 
+      const productId = response.data.product.id;
+
+      // 2. Initialize on blockchain if requested and wallet is connected
+      if (initializeOnChain && connected && publicKey && accessMintProgram && distributionProgram) {
+        setInitLoading(true);
+        try {
+          // Get initialization parameters from backend API
+          const initResponse = await axios.post("/api/product/initialize", {
+            productId,
+          });
+          const { accessMint, distribution } = initResponse.data.params;
+
+          // Ensure we use the creator from backend (must match wallet address in database)
+          const creatorPublicKey = new PublicKey(accessMint.creator);
+          
+          // Verify connected wallet matches the creator
+          if (!publicKey!.equals(creatorPublicKey)) {
+            throw new Error("Connected wallet does not match the product creator. Please connect the correct wallet.");
+          }
+
+          // Ensure contentId is exactly 32 bytes
+          const contentIdBuffer = Buffer.from(accessMint.contentId);
+          if (contentIdBuffer.length !== 32) {
+            throw new Error(`Content ID must be exactly 32 bytes, got ${contentIdBuffer.length}`);
+          }
+
+          // Create mint keypair - Anchor will create the account automatically
+          const mintKeypair = Keypair.generate();
+          const mintAuthorityPda = new PublicKey(accessMint.mintAuthority || "");
+
+          // Initialize Access Mint - Anchor's init constraint will handle mint account creation
+          const accessMintTx = await accessMintProgram.methods
+            .initializeMint(
+              Array.from(contentIdBuffer), // Convert to array for Anchor
+              new anchor.BN(accessMint.seed)
+            )
+            .accounts({
+              creator: creatorPublicKey,
+              accessMintState: new PublicKey(accessMint.accessMintState),
+              mint: mintKeypair.publicKey,
+              mintAuthority: mintAuthorityPda,
+              tokenProgram: TOKEN_PROGRAM_ID,
+              systemProgram: SystemProgram.programId,
+              rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+            })
+            .signers([mintKeypair])
+            .rpc();
+
+          // Initialize Distribution - use same contentId and creator
+          const distributionContentId = Buffer.from(distribution.contentId);
+          if (distributionContentId.length !== 32) {
+            throw new Error(`Distribution content ID must be exactly 32 bytes, got ${distributionContentId.length}`);
+          }
+
+          const distributionTx = await distributionProgram.methods
+            .initializeSplit(
+              Array.from(distributionContentId), // Convert to array for Anchor
+              distribution.platformFeeBps,
+              [], // No collaborators for now
+              new anchor.BN(distribution.seed)
+            )
+            .accounts({
+              creator: creatorPublicKey, // Use same creator as Access Mint
+              platformTreasury: new PublicKey(distribution.platformTreasury),
+              splitState: new PublicKey(distribution.splitState),
+              systemProgram: SystemProgram.programId,
+            })
+            .rpc();
+
+          // Confirm initialization in database
+          await axios.post("/api/product/confirm-initialization", {
+            productId,
+            accessMintAddress: mintKeypair.publicKey.toString(),
+            splitStateAddress: distribution.splitState,
+            txSignature: accessMintTx,
+          });
+
+          alert("Product created and initialized on blockchain successfully!");
+          } catch (initError: unknown) {
+          console.error("Failed to initialize on blockchain:", initError);
+          alert(
+            `Product created but blockchain initialization failed: ${initError instanceof Error ? initError.message : String(initError)}. You can initialize it later from the dashboard.`
+          );
+        } finally {
+          setInitLoading(false);
+        }
+      } else if (initializeOnChain && (!connected || !publicKey)) {
+        alert("Please connect your wallet to initialize on blockchain.");
+      } else if (initializeOnChain && (!accessMintProgram || !distributionProgram)) {
+        alert("Blockchain programs not available. Please try again later.");
+      }
+
       // Success - reset form
       setFormData({ name: "", description: "", amount: "", gdriveLink: "" });
       setCoverImage(null);
+      setInitializeOnChain(false);
       
       // Call onSuccess callback if provided
       if (onSuccess) {
@@ -219,17 +326,33 @@ export function CreateProductForm({ onSuccess }: CreateProductFormProps) {
             </div>
           </div>
 
+          {/* Initialize on blockchain checkbox */}
+          <div className="px-6 pb-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="initialize"
+                checked={initializeOnChain}
+                onCheckedChange={(checked) => setInitializeOnChain(checked === true)}
+                disabled={!connected}
+              />
+              <Label htmlFor="initialize" className="text-sm text-zinc-300 cursor-pointer">
+                <Zap className="inline h-4 w-4 mr-1" />
+                Initialize on blockchain {!connected && "(Connect wallet first)"}
+              </Label>
+            </div>
+          </div>
+
         </CardContent>
         <CardFooter className="flex justify-end pt-2">
            <Button 
             type="submit" 
-            disabled={loading}
+            disabled={loading || initLoading || (!connected && initializeOnChain)}
             className="bg-[#007DFC] hover:bg-[#0063ca] text-white font-semibold shadow-[0_0_20px_-5px_#007DFC]"
           >
-            {loading ? (
+            {loading || initLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
+                {initLoading ? "Initializing..." : "Creating..."}
               </>
             ) : (
               "Create Product"

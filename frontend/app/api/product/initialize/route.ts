@@ -92,6 +92,7 @@ export async function POST(req: NextRequest) {
           contentId: Array.from(contentId),
           seed: seed,
           accessMintState: accessMintStatePda.toString(),
+          mintAuthority: accessMintAuthorityPda.toString(),
           creator: creatorPublicKey.toString(),
         },
         // Distribution initialization params

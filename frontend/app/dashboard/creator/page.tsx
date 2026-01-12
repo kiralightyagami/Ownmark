@@ -3,10 +3,12 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, DollarSign, Package, TrendingUp, Loader2, ExternalLink } from "lucide-react";
+import { Plus, DollarSign, Package, TrendingUp, Loader2, ExternalLink, CheckCircle2, AlertCircle, Wallet } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import { CreateProductForm } from "@/components/dashboard/create-product-form";
 import { useSession } from "@/lib/auth-client";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import axios from "axios";
 import Link from "next/link";
 import Image from "next/image";
@@ -34,9 +36,12 @@ interface Product {
 export default function CreatorDashboard() {
   const dragNodeRef = useRef(null);
   const { data: session } = useSession();
+  const { publicKey, connected } = useWallet();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [savingWallet, setSavingWallet] = useState(false);
   const [stats, setStats] = useState({
     totalRevenue: "0 SOL",
     activeProducts: 0,
@@ -100,6 +105,26 @@ export default function CreatorDashboard() {
     }
   }, [session, fetchProducts]);
 
+  // Save wallet address when connected
+  useEffect(() => {
+    if (connected && publicKey) {
+      const address = publicKey.toBase58();
+      setWalletAddress(address);
+      handleSaveWallet(address);
+    }
+  }, [connected, publicKey]);
+
+  const handleSaveWallet = async (address: string) => {
+    try {
+      setSavingWallet(true);
+      await axios.post("/api/user/wallet", { walletAddress: address });
+    } catch (error) {
+      console.error("Failed to save wallet address:", error);
+    } finally {
+      setSavingWallet(false);
+    }
+  };
+
   const handleProductCreated = () => {
     // Refresh products after creation
     setDialogOpen(false);
@@ -115,21 +140,42 @@ export default function CreatorDashboard() {
           <p className="text-zinc-400">Manage your products and track your performance.</p>
         </div>
         
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-[#007DFC] hover:bg-[#0063ca] text-white shadow-[0_0_15px_-5px_#007DFC]">
-              <Plus className="mr-2 h-4 w-4" /> Create New Product
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-transparent border-none p-0 max-w-2xl shadow-none overflow-visible">
-            <DialogTitle className="sr-only">Create New Product</DialogTitle>
-            <Draggable handle=".drag-handle" nodeRef={dragNodeRef}>
-              <div className="w-full" ref={dragNodeRef}>
-                <CreateProductForm onSuccess={handleProductCreated} />
+        <div className="flex items-center gap-3">
+          {/* Wallet Connection */}
+          <div className="flex items-center gap-2">
+            {connected && publicKey ? (
+              <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span className="text-sm text-white">
+                  {publicKey.toBase58().slice(0, 4)}...{publicKey.toBase58().slice(-4)}
+                </span>
+                {savingWallet && <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />}
               </div>
-            </Draggable>
-          </DialogContent>
-        </Dialog>
+            ) : (
+              <div className="flex items-center gap-2 bg-yellow-900/20 border border-yellow-800 rounded-lg px-3 py-2">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <span className="text-sm text-yellow-500">Wallet not connected</span>
+              </div>
+            )}
+            <WalletMultiButton />
+          </div>
+          
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-[#007DFC] hover:bg-[#0063ca] text-white shadow-[0_0_15px_-5px_#007DFC]">
+                <Plus className="mr-2 h-4 w-4" /> Create New Product
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-transparent border-none p-0 max-w-2xl shadow-none overflow-visible">
+              <DialogTitle className="sr-only">Create New Product</DialogTitle>
+              <Draggable handle=".drag-handle" nodeRef={dragNodeRef}>
+                <div className="w-full" ref={dragNodeRef}>
+                  <CreateProductForm onSuccess={handleProductCreated} />
+                </div>
+              </Draggable>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Stats Grid */}

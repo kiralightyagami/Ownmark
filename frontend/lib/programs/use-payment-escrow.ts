@@ -26,11 +26,14 @@ export function usePaymentEscrowProgram() {
   const program = useMemo(() => {
     if (!provider) return null;
 
-    // TODO: Replace with actual IDL import when generated
-    // const idl = require("../../payment-escrow/target/idl/payment_escrow.json");
-    // return new Program(idl as Idl, provider);
-
-    return null;
+    try {
+      // Import IDL dynamically - adjust path based on your project structure
+      const idl = require("../../../payment-escrow/target/idl/payment_escrow.json");
+      return new Program(idl as Idl, provider);
+    } catch (error) {
+      console.warn("Failed to load Payment Escrow IDL:", error);
+      return null;
+    }
   }, [provider]);
 
   return { program, provider, programId: PAYMENT_ESCROW_PROGRAM_ID };

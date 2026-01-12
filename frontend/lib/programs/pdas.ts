@@ -97,7 +97,7 @@ export function deriveSplitState(
   
   return PublicKey.findProgramAddressSync(
     [
-      Buffer.from("split_state"),
+      Buffer.from("split"), // Must match SplitState::SEED_PREFIX in Rust
       creator.toBuffer(),
       Buffer.from(contentId),
       seedBuffer,
