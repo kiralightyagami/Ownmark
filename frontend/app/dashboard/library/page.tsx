@@ -136,7 +136,7 @@ export default function LibraryPage() {
           <p className="text-zinc-500 text-sm mb-6">
             Start browsing the marketplace to discover digital assets
           </p>
-          <Button asChild className="bg-[#007DFC] hover:bg-[#0063ca]">
+          <Button asChild className="bg-[#007DFC] hover:bg-[#0063ca] text-black">
             <Link href="/marketplace">Browse Marketplace</Link>
           </Button>
         </div>
@@ -170,7 +170,7 @@ export default function LibraryPage() {
                 <Button
                   asChild
                   variant="outline"
-                  className="w-full border-zinc-700 text-white hover:bg-zinc-800"
+                  className="w-full border-zinc-700 text-black bg-white hover:bg-zinc-200"
                 >
                   <a href={product.gdriveLink} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="mr-2 h-4 w-4" />
