@@ -4,7 +4,7 @@
 
 <h1 align="center">Ownmark - Create it.Own it.Ship it.</h1>
 
-## Decentralized Creator Commerce Platform on Solana
+## Decentralized Creator Commerce Platform.
 
 ## 1. WHAT
 
@@ -212,5 +212,4 @@ Buyers will browse listings, purchase digital content, receive an on-chain acces
 6. Unlock and view the content using wallet-based validation.
 7. Access purchase history from the dashboard anytime.
 
----
 ---
